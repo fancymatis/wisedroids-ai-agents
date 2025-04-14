@@ -1,77 +1,43 @@
-import os
 import streamlit as st
-from typing import Dict, Any
+import random
 from crewai import Agent, Task, Crew
-from crewai.tools import tool
-import requests
-from pydantic import BaseModel, Field
+from crewai.tools import Tool
 
-LASTFM_API_KEY = "your_lastfm_api_key_here"
+@Tool
+def pick_random_number(min_value: int = 1, max_value: int = 100) -> int:
+    return random.randint(min_value, max_value)
 
-class SingerInfo(BaseModel):
-    name: str = Field(..., description="The name of the singer")
-    bio: str = Field(..., description="A brief biography of the singer")
-
-class MusicResearchTool:
-    @tool("Get singer bio by song name")
-    def get_singer_bio(self, song_name: str) -> Dict[str, Any]:
-        try:
-            search_url = f"http://ws.audioscrobbler.com/2.0/?method=track.search&track={song_name}&api_key={LASTFM_API_KEY}&format=json"
-            response = requests.get(search_url)
-            response.raise_for_status()
-            data = response.json()
-            
-            artist_name = data['results']['trackmatches']['track'][0]['artist']
-            
-            artist_url = f"http://ws.audioscrobbler.com/2.0/?method=artist.getinfo&artist={artist_name}&api_key={LASTFM_API_KEY}&format=json"
-            response = requests.get(artist_url)
-            response.raise_for_status()
-            artist_data = response.json()
-            
-            bio = artist_data['artist']['bio']['summary']
-            
-            return SingerInfo(name=artist_name, bio=bio).dict()
-        except requests.RequestException as e:
-            st.error(f"Error fetching data from Last.fm API: {e}")
-            return SingerInfo(name="Unknown", bio="Unable to fetch biography").dict()
-        except (KeyError, IndexError) as e:
-            st.error(f"Error parsing API response: {e}")
-            return SingerInfo(name="Unknown", bio="Unable to parse biography").dict()
-
-def initialize_agent() -> Agent:
+def create_number_picker_agent() -> Agent:
     return Agent(
-        role="Music Researcher",
-        goal="Find music singer biographies based on song names",
-        backstory="I am an AI agent specialized in researching music artists and their backgrounds.",
+        name="Number Picker",
+        role="Random Number Generator",
+        goal="Pick random numbers as requested",
+        backstory="I am an AI agent specialized in generating random numbers.",
         verbose=True,
-        allow_delegation=False,
-        tools=[MusicResearchTool().get_singer_bio]
+        tools=[pick_random_number]
     )
 
-def create_task(song_name: str) -> Task:
+def create_number_picking_task() -> Task:
     return Task(
-        description=f"Find the biography of the singer who performed the song '{song_name}'",
-        expected_output="A dictionary containing the singer's name and a brief biography",
-        agent=initialize_agent()
+        description="Pick a random number between 1 and 100",
+        expected_output="A random integer between 1 and 100",
+        agent=create_number_picker_agent()
     )
 
-def run_crew(song_name: str) -> Dict[str, Any]:
+def run_number_picker_crew() -> str:
     crew = Crew(
-        agents=[initialize_agent()],
-        tasks=[create_task(song_name)],
+        agents=[create_number_picker_agent()],
+        tasks=[create_number_picking_task()],
         verbose=True
     )
     result = crew.kickoff()
     return result
 
-st.title("Music Singer Biography Finder")
+st.title("Random Number Picker")
 
-song_name = st.text_input("Enter a song name:", "Bohemian Rhapsody")
-
-if st.button("Find Singer Bio"):
-    with st.spinner("Searching for singer's biography..."):
-        result = run_crew(song_name)
-    
-    st.subheader(f"Singer Info for '{song_name}':")
-    st.write(f"**Name:** {result['name']}")
-    st.write(f"**Bio:** {result['bio']}")
+if st.button("Pick a Random Number"):
+    try:
+        result = run_number_picker_crew()
+        st.success(f"Random number picked: {result}")
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")

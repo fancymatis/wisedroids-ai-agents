@@ -44,60 +44,60 @@ def set_openai_api_key(api_key: str):
     os.environ["OPENAI_API_KEY"] = api_key
 
 def check_api_key():
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        st.sidebar.error("Please enter your OpenAI API key.")
-        return False
     try:
-        openai.api_key = api_key
-        openai.Completion.create(model="text-davinci-002", prompt="Test", max_tokens=5)
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+        openai.Completion.create(engine="davinci", prompt="Test", max_tokens=5)
         return True
     except:
-        st.sidebar.error("Invalid API key. Please try again.")
         return False
 
 def main():
-    st.title("AI News Fetcher")
+    st.title("AI News Aggregator")
 
-    st.sidebar.title("OpenAI API Key")
-    api_key = st.sidebar.text_input("Enter your OpenAI API key:", type="password")
+    st.sidebar.header("OpenAI API Key")
+    api_key = st.sidebar.text_input("Enter your OpenAI API key", type="password")
+
     if api_key:
         set_openai_api_key(api_key)
-
-    if check_api_key():
-        ai_news_agent = Agent(
-            name="AI News",
-            role="AI Topics information provider",
-            goal="Provide up-to-date information about AI topics",
-            backstory="I am an AI agent specialized in gathering and presenting the latest news and developments in artificial intelligence.",
-            verbose=True,
-            allow_delegation=False,
-            tools=[fetch_ai_news]
-        )
-
-        ai_news_task = Task(
-            description="Fetch and summarize the latest AI news",
-            agent=ai_news_agent,
-            expected_output="A summary of the latest AI news articles with their titles and URLs",
-            tools=[fetch_ai_news]
-        )
-
-        ai_news_crew = Crew(
-            agents=[ai_news_agent],
-            tasks=[ai_news_task],
-            verbose=True
-        )
-
-        if st.button("Fetch AI News"):
-            try:
-                with st.spinner("Fetching AI news..."):
-                    result = ai_news_crew.kickoff()
-                st.subheader("AI News Summary:")
-                st.write(result)
-            except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
+        if check_api_key():
+            st.success("API key is valid. You can now use the application.")
+            run_ai_news_crew()
+        else:
+            st.error("Invalid API key. Please enter a valid OpenAI API key.")
     else:
-        st.info("Please enter your OpenAI API key in the sidebar to use this application.")
+        st.info("Please enter your OpenAI API key in the sidebar to use the application.")
+
+def run_ai_news_crew():
+    ai_news_agent = Agent(
+        name="AI News",
+        role="AI Topics information provider",
+        goal="Provide up-to-date information about AI topics",
+        backstory="I am an AI agent specialized in gathering and presenting the latest news and developments in artificial intelligence.",
+        verbose=True,
+        allow_delegation=False,
+        tools=[fetch_ai_news]
+    )
+
+    ai_news_task = Task(
+        description="Fetch and summarize the latest AI news",
+        agent=ai_news_agent,
+        expected_output="A summary of the latest AI news articles with their titles and URLs",
+        tools=[fetch_ai_news]
+    )
+
+    ai_news_crew = Crew(
+        agents=[ai_news_agent],
+        tasks=[ai_news_task],
+        verbose=True
+    )
+
+    try:
+        with st.spinner("Fetching AI news..."):
+            result = ai_news_crew.kickoff()
+        st.subheader("AI News Summary:")
+        st.write(result)
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
 
 if __name__ == "__main__":
     main()

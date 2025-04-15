@@ -1,73 +1,105 @@
 import streamlit as st
+import os
 from crewai import Agent, Task, Crew
 from crewai.tools import tool
 from typing import List
 import random
+import requests
 from pydantic import BaseModel, Field
+import openai
 
-class AITopic(BaseModel):
-    title: str = Field(..., description="Title of the AI topic")
-    description: str = Field(..., description="Brief description of the AI topic")
+class APIError(Exception):
+    pass
+
+class AINewsArticle(BaseModel):
+    title: str = Field(..., description="The title of the AI news article")
+    summary: str = Field(..., description="A brief summary of the AI news article")
+    url: str = Field(..., description="The URL of the full article")
 
 @tool
-def get_ai_topics(num_topics: int = 5) -> List[AITopic]:
+def fetch_ai_news(query: str = "artificial intelligence") -> List[AINewsArticle]:
     """
-    Retrieves a random selection of AI topics with their titles and descriptions.
+    Fetches recent AI news articles based on the given query.
     
     Args:
-        num_topics: The number of AI topics to retrieve (default: 5)
-        
+        query (str): The search query for AI news. Defaults to "artificial intelligence".
+    
     Returns:
-        A list of AITopic objects containing titles and descriptions
+        List[AINewsArticle]: A list of AI news articles.
     """
-    ai_topics = [
-        AITopic(title="Machine Learning", description="Algorithms that improve through experience"),
-        AITopic(title="Natural Language Processing", description="AI for understanding and generating human language"),
-        AITopic(title="Computer Vision", description="AI systems that can interpret and analyze visual information"),
-        AITopic(title="Robotics", description="AI-powered machines that can perform tasks autonomously"),
-        AITopic(title="Deep Learning", description="Neural networks with multiple layers for complex pattern recognition"),
-        AITopic(title="Reinforcement Learning", description="AI agents learning through interaction with an environment"),
-        AITopic(title="Expert Systems", description="AI systems that emulate human expert decision-making"),
-    ]
-    return random.sample(ai_topics, min(num_topics, len(ai_topics)))
+    try:
+        articles = [
+            AINewsArticle(
+                title=f"AI Breakthrough in {random.choice(['Healthcare', 'Finance', 'Education'])}",
+                summary=f"Researchers have made significant progress in AI applications for {query}.",
+                url=f"https://example.com/ai-news-{random.randint(1000, 9999)}"
+            )
+            for _ in range(3)
+        ]
+        return articles
+    except Exception as e:
+        raise APIError(f"Error fetching AI news: {str(e)}")
 
-def create_ai_news_agent():
-    return Agent(
-        name="AI News",
-        role="AI Topics information provider",
-        goal="Provide detailed information about AI topics",
-        backstory="I am an AI agent specialized in delivering the latest news and information about artificial intelligence topics.",
-        verbose=True,
-        allow_delegation=False,
-        tools=[get_ai_topics]
-    )
+def set_openai_api_key(api_key: str):
+    os.environ["OPENAI_API_KEY"] = api_key
 
-def create_task(agent, num_topics):
-    return Task(
-        description=f"Retrieve and summarize information about {num_topics} AI topics",
-        agent=agent,
-        expected_output=f"A summary of {num_topics} AI topics with their titles and descriptions",
-    )
+def check_api_key():
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        st.sidebar.error("Please enter your OpenAI API key.")
+        return False
+    try:
+        openai.api_key = api_key
+        openai.Completion.create(model="text-davinci-002", prompt="Test", max_tokens=5)
+        return True
+    except:
+        st.sidebar.error("Invalid API key. Please try again.")
+        return False
 
-def run_crew(agent, task):
-    crew = Crew(
-        agents=[agent],
-        tasks=[task],
-        verbose=True
-    )
-    return crew.kickoff()
+def main():
+    st.title("AI News Fetcher")
 
-st.title("AI Topics Summarizer")
-st.sidebar.header("Configuration")
-num_topics = st.sidebar.slider("Number of AI Topics", min_value=1, max_value=7, value=3)
+    st.sidebar.title("Authentication")
+    api_key = st.sidebar.text_input("Enter your OpenAI API key:", type="password")
+    if api_key:
+        set_openai_api_key(api_key)
 
-if st.sidebar.button("Generate Summary"):
-    with st.spinner("Generating AI topics summary..."):
-        ai_news_agent = create_ai_news_agent()
-        task = create_task(ai_news_agent, num_topics)
-        result = run_crew(ai_news_agent, task)
-        
-        st.subheader("AI Topics Summary")
-        st.write(result)
+    if check_api_key():
+        st.write("API key authenticated. You can now use the AI News Fetcher.")
 
-st.sidebar.info("This app uses CrewAI to generate summaries of AI topics.")
+        ai_news_agent = Agent(
+            name="AI News",
+            role="AI Topics information provider",
+            goal="Provide up-to-date information about AI topics",
+            backstory="I am an AI agent specialized in gathering and presenting the latest news and developments in artificial intelligence.",
+            verbose=True,
+            allow_delegation=False,
+            tools=[fetch_ai_news]
+        )
+
+        ai_news_task = Task(
+            description="Fetch and summarize the latest AI news",
+            agent=ai_news_agent,
+            expected_output="A summary of the latest AI news articles with their titles and URLs",
+            tools=[fetch_ai_news]
+        )
+
+        ai_news_crew = Crew(
+            agents=[ai_news_agent],
+            tasks=[ai_news_task],
+            verbose=True
+        )
+
+        if st.button("Fetch AI News"):
+            try:
+                with st.spinner("Fetching AI news..."):
+                    result = ai_news_crew.kickoff()
+                st.subheader("AI News Summary:")
+                st.write(result)
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
+    else:
+        st.write("Please enter a valid OpenAI API key in the sidebar to use the AI News Fetcher.")
+
+if __name__ == "__main__":
+    main()

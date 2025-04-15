@@ -19,7 +19,7 @@ def main():
         set_openai_api_key(api_key)
 
     if not check_api_key():
-        st.warning("Please enter your OpenAI API key to proceed.")
+        st.warning("Please enter your OpenAI API key to continue.")
         return
 
     st.write("Welcome to the AI Research Assistant!")
@@ -52,8 +52,8 @@ def main():
 
                 result = crew.kickoff()
 
-                st.subheader("Research Summary:")
-                st.write(result)
+            st.subheader("Research Summary:")
+            st.write(result)
         except Exception as e:
             st.error(f"An error occurred: {str(e)}")
 

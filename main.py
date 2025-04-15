@@ -1,43 +1,65 @@
 import streamlit as st
-import random
 from crewai import Agent, Task, Crew
-from crewai.tools import Tool
+from crewai.tools import tool
+from typing import List
+import random
+from pydantic import BaseModel, Field
 
-@Tool
-def pick_random_number(min_value: int = 1, max_value: int = 100) -> int:
-    return random.randint(min_value, max_value)
+class AITopic(BaseModel):
+    title: str = Field(..., description="Title of the AI topic")
+    description: str = Field(..., description="Brief description of the AI topic")
 
-def create_number_picker_agent() -> Agent:
+@tool
+def get_ai_topics(num_topics: int = 5) -> List[AITopic]:
+    ai_topics = [
+        AITopic(title="Machine Learning", description="Algorithms that improve through experience"),
+        AITopic(title="Natural Language Processing", description="AI for understanding and generating human language"),
+        AITopic(title="Computer Vision", description="AI systems that can interpret and analyze visual information"),
+        AITopic(title="Robotics", description="AI-powered machines that can perform tasks autonomously"),
+        AITopic(title="Deep Learning", description="Neural networks with multiple layers for complex pattern recognition"),
+        AITopic(title="Reinforcement Learning", description="AI agents learning through interaction with an environment"),
+        AITopic(title="Expert Systems", description="AI systems that emulate human expert decision-making"),
+    ]
+    return random.sample(ai_topics, min(num_topics, len(ai_topics)))
+
+def create_ai_news_agent():
     return Agent(
-        name="Number Picker",
-        role="Random Number Generator",
-        goal="Pick random numbers as requested",
-        backstory="I am an AI agent specialized in generating random numbers.",
+        name="AI News",
+        role="AI Topics information provider",
+        goal="Provide detailed information about AI topics",
+        backstory="I am an AI agent specialized in delivering the latest news and information about artificial intelligence topics.",
         verbose=True,
-        tools=[pick_random_number]
+        allow_delegation=False,
+        tools=[get_ai_topics]
     )
 
-def create_number_picking_task() -> Task:
+def create_task(agent, num_topics):
     return Task(
-        description="Pick a random number between 1 and 100",
-        expected_output="A random integer between 1 and 100",
-        agent=create_number_picker_agent()
+        description=f"Retrieve and summarize information about {num_topics} AI topics",
+        agent=agent,
+        expected_output=f"A summary of {num_topics} AI topics with their titles and descriptions",
     )
 
-def run_number_picker_crew() -> str:
+def run_crew(agent, task):
     crew = Crew(
-        agents=[create_number_picker_agent()],
-        tasks=[create_number_picking_task()],
+        agents=[agent],
+        tasks=[task],
         verbose=True
     )
-    result = crew.kickoff()
-    return result
+    return crew.kickoff()
 
-st.title("Random Number Picker")
+st.title("AI Topics Summarizer")
 
-if st.button("Pick a Random Number"):
-    try:
-        result = run_number_picker_crew()
-        st.success(f"Random number picked: {result}")
-    except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
+st.sidebar.header("Configuration")
+num_topics = st.sidebar.slider("Number of AI Topics", min_value=1, max_value=7, value=3)
+
+if st.sidebar.button("Generate Summary"):
+    with st.spinner("Generating AI topics summary..."):
+        ai_news_agent = create_ai_news_agent()
+        task = create_task(ai_news_agent, num_topics)
+        result = run_crew(ai_news_agent, task)
+        
+        st.subheader("AI Topics Summary")
+        st.write(result)
+
+st.sidebar.info("This app uses CrewAI to generate summaries of AI topics.")

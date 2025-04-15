@@ -11,6 +11,15 @@ class AITopic(BaseModel):
 
 @tool
 def get_ai_topics(num_topics: int = 5) -> List[AITopic]:
+    """
+    Retrieves a random selection of AI topics with their titles and descriptions.
+    
+    Args:
+        num_topics: The number of AI topics to retrieve (default: 5)
+        
+    Returns:
+        A list of AITopic objects containing titles and descriptions
+    """
     ai_topics = [
         AITopic(title="Machine Learning", description="Algorithms that improve through experience"),
         AITopic(title="Natural Language Processing", description="AI for understanding and generating human language"),
@@ -49,7 +58,6 @@ def run_crew(agent, task):
     return crew.kickoff()
 
 st.title("AI Topics Summarizer")
-
 st.sidebar.header("Configuration")
 num_topics = st.sidebar.slider("Number of AI Topics", min_value=1, max_value=7, value=3)
 
